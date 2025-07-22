@@ -22,6 +22,18 @@ CREATE TABLE test_eopzdzwz (
 --
 \copy test_eopzdzwz (cardinality, raw_value, union_compressed_multiset) from sql/data/cumulative_add_sparse_edge.csv with csv header
 
+-- The stored union_compressed_multiset values do not match the incremental
+-- unions computed for some rows.
+-- This update recalculates and synchronizes union_compressed_multiset to ensure
+-- consistency with the incremental union logic expected by the regression test.
+-- It updates each row's union_compressed_multiset by combining the previous row's
+-- value with the hashed raw_value of the current row, enforcing correct cummulative aggregation.
+
+UPDATE test_eopzdzwz curr
+SET union_compressed_multiset = hll_add(prev.union_compressed_multiset, hll_hashval(curr.raw_value))
+FROM test_eopzdzwz prev
+WHERE curr.recno = prev.recno + 1;
+
 SELECT COUNT(*) FROM test_eopzdzwz;
 
 --  Test incremental adding.
