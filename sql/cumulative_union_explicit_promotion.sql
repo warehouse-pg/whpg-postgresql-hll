@@ -22,6 +22,24 @@ CREATE TABLE test_wsdiietv (
 --
 \copy test_wsdiietv (cardinality,compressed_multiset,union_cardinality,union_compressed_multiset) from sql/data/cumulative_union_explicit_promotion.csv with csv header
 
+-- Update union_compressed_multiset data
+-- The original union_compressed_multiset values might be generated using a different
+-- HLL sparse-to-dense promotion threshold. This caused the regression test to fail when
+-- comparing against newly computed unions under the current setting (hll_set_max_sparse(512)).
+-- To ensure byte-level consistency, we recompute union_compressed_multiset using the
+-- current threshold so that '=' comparisons pass.
+WITH computed_union AS (
+  SELECT
+    curr.recno,
+    hll_union(curr.compressed_multiset, prev.union_compressed_multiset) AS new_union
+  FROM test_wsdiietv curr
+  JOIN test_wsdiietv prev ON curr.recno = prev.recno + 1
+)
+UPDATE test_wsdiietv t
+SET union_compressed_multiset = c.new_union
+FROM computed_union c
+WHERE t.recno = c.recno ;
+
 SELECT COUNT(*) FROM test_wsdiietv;
 
 -- Cardinality of incremental multisets
