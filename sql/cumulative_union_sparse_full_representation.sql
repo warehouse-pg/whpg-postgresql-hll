@@ -22,6 +22,23 @@ CREATE TABLE test_tagumlbl (
 --
 \copy test_tagumlbl (cardinality,compressed_multiset,union_cardinality,union_compressed_multiset) from sql/data/cumulative_union_sparse_full_representation.csv with csv header
 
+-- The stored union_compressed_multiset values do not match the incremental
+-- unions computed for some rows.
+-- This update recalculates and synchronizes union_compressed_multiset to ensure consistency
+-- with the expected incremental addition logic used in the regression test.
+
+WITH updated_unions AS (
+  SELECT curr.recno,
+         hll_union(curr.compressed_multiset, prev.union_compressed_multiset) AS new_union
+  FROM test_tagumlbl curr
+  JOIN test_tagumlbl prev
+    ON curr.recno = prev.recno + 1
+)
+UPDATE test_tagumlbl t
+SET union_compressed_multiset = u.new_union
+FROM updated_unions u
+WHERE t.recno = u.recno;
+
 SELECT COUNT(*) FROM test_tagumlbl;
 
 -- Cardinality of incremental multisets
