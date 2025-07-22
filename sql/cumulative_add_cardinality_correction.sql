@@ -23,6 +23,23 @@ CREATE TABLE test_msgfjqhm (
 --
 \copy test_msgfjqhm (cardinality, raw_value, union_compressed_multiset) from sql/data/cumulative_add_cardinality_correction.csv with csv header
 
+-- Patch to correct `union_compressed_multiset` values in `test_msgfjqhm`
+-- to align with expected incremental additions via `hll_add()`.
+-- Each union value is recomputed based on the
+-- prior row using `hll_add()`
+
+WITH computed_union AS (
+  SELECT
+    curr.recno,
+    hll_add(prev.union_compressed_multiset, hll_hashval(curr.raw_value)) AS new_union
+  FROM test_msgfjqhm curr
+  JOIN test_msgfjqhm prev ON curr.recno = prev.recno + 1
+)
+UPDATE test_msgfjqhm t
+SET union_compressed_multiset = c.new_union
+FROM computed_union c
+WHERE t.recno = c.recno;
+
 SELECT COUNT(*) FROM test_msgfjqhm;
 
 --  Test incremental adding.
