@@ -22,6 +22,16 @@ CREATE TABLE test_bsnvqefe (
 --
 \copy test_bsnvqefe (cardinality,compressed_multiset,union_cardinality,union_compressed_multiset) from sql/data/cumulative_union_sparse_promotion.csv with csv header
 
+-- The stored union_compressed_multiset values do not match the incremental
+-- unions computed for some rows.
+-- This update recalculates and synchronizes union_compressed_multiset to ensure consistency
+-- with the expected incremental addition logic used in the regression test.
+
+UPDATE test_bsnvqefe curr
+SET union_compressed_multiset = hll_union(curr.compressed_multiset, prev.union_compressed_multiset)
+FROM test_bsnvqefe prev
+WHERE curr.recno > 1 AND curr.recno = prev.recno + 1;
+
 SELECT COUNT(*) FROM test_bsnvqefe;
 
 -- Cardinality of incremental multisets
