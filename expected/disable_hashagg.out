@@ -45,12 +45,14 @@ SELECT
 FROM 
 	tt1 
 GROUP BY(id);
-      QUERY PLAN       
------------------------
- HashAggregate
-   Group Key: id
-   ->  Seq Scan on tt1
-(3 rows)
+                QUERY PLAN                
+------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  HashAggregate
+         Group Key: id
+         ->  Seq Scan on tt1
+ Optimizer: Postgres-based planner
+(5 rows)
 
 SET hll.force_groupagg to ON;
 EXPLAIN(COSTS OFF)
@@ -59,14 +61,16 @@ SELECT
 FROM 
 	tt1 
 GROUP BY(id);
-         QUERY PLAN          
------------------------------
- GroupAggregate
-   Group Key: id
-   ->  Sort
-         Sort Key: id
-         ->  Seq Scan on tt1
-(5 rows)
+                QUERY PLAN                
+------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  GroupAggregate
+         Group Key: id
+         ->  Sort
+               Sort Key: id
+               ->  Seq Scan on tt1
+ Optimizer: Postgres-based planner
+(7 rows)
 
 -- Test with operator over aggregate
 SET hll.force_groupagg to OFF;
@@ -76,12 +80,14 @@ SELECT
 FROM 
 	tt1 
 GROUP BY(id);
-      QUERY PLAN       
------------------------
- HashAggregate
-   Group Key: id
-   ->  Seq Scan on tt1
-(3 rows)
+                QUERY PLAN                
+------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  HashAggregate
+         Group Key: id
+         ->  Seq Scan on tt1
+ Optimizer: Postgres-based planner
+(5 rows)
 
 SET hll.force_groupagg to ON;
 EXPLAIN(COSTS OFF)
@@ -90,14 +96,16 @@ SELECT
 FROM 
 	tt1 
 GROUP BY(id);
-         QUERY PLAN          
------------------------------
- GroupAggregate
-   Group Key: id
-   ->  Sort
-         Sort Key: id
-         ->  Seq Scan on tt1
-(5 rows)
+                QUERY PLAN                
+------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  GroupAggregate
+         Group Key: id
+         ->  Sort
+               Sort Key: id
+               ->  Seq Scan on tt1
+ Optimizer: Postgres-based planner
+(7 rows)
 
 -- Test with function over aggregate
 SET hll.force_groupagg to OFF;
@@ -107,12 +115,14 @@ SELECT
 FROM 
 	tt1 
 GROUP BY(id);
-      QUERY PLAN       
------------------------
- HashAggregate
-   Group Key: id
-   ->  Seq Scan on tt1
-(3 rows)
+                QUERY PLAN                
+------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  HashAggregate
+         Group Key: id
+         ->  Seq Scan on tt1
+ Optimizer: Postgres-based planner
+(5 rows)
 
 SET hll.force_groupagg to ON;
 EXPLAIN(COSTS OFF)
@@ -121,14 +131,16 @@ SELECT
 FROM 
 	tt1 
 GROUP BY(id);
-         QUERY PLAN          
------------------------------
- GroupAggregate
-   Group Key: id
-   ->  Sort
-         Sort Key: id
-         ->  Seq Scan on tt1
-(5 rows)
+                QUERY PLAN                
+------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  GroupAggregate
+         Group Key: id
+         ->  Sort
+               Sort Key: id
+               ->  Seq Scan on tt1
+ Optimizer: Postgres-based planner
+(7 rows)
 
 -- Test with having clause
 SET hll.force_groupagg to OFF;
@@ -139,13 +151,15 @@ FROM
 	tt1 
 GROUP BY(id)
 HAVING hll_cardinality(hll_union_agg(sd)) > 1;
-                               QUERY PLAN                               
-------------------------------------------------------------------------
- HashAggregate
-   Group Key: id
-   Filter: (hll_cardinality(hll_union_agg(sd)) > '1'::double precision)
-   ->  Seq Scan on tt1
-(4 rows)
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  HashAggregate
+         Group Key: id
+         Filter: (hll_cardinality(hll_union_agg(sd)) > '1'::double precision)
+         ->  Seq Scan on tt1
+ Optimizer: Postgres-based planner
+(6 rows)
 
 SET hll.force_groupagg to ON;
 EXPLAIN(COSTS OFF)
@@ -155,15 +169,17 @@ FROM
 	tt1 
 GROUP BY(id)
 HAVING hll_cardinality(hll_union_agg(sd)) > 1;
-                               QUERY PLAN                               
-------------------------------------------------------------------------
- GroupAggregate
-   Group Key: id
-   Filter: (hll_cardinality(hll_union_agg(sd)) > '1'::double precision)
-   ->  Sort
-         Sort Key: id
-         ->  Seq Scan on tt1
-(6 rows)
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  GroupAggregate
+         Group Key: id
+         Filter: (hll_cardinality(hll_union_agg(sd)) > '1'::double precision)
+         ->  Sort
+               Sort Key: id
+               ->  Seq Scan on tt1
+ Optimizer: Postgres-based planner
+(8 rows)
 
 -- Test hll_add_agg, first set work_mem to 256MB in order to use hash aggregate
 -- before forcing group aggregate
@@ -178,12 +194,14 @@ SELECT
 FROM 
 	add_test_table 
 GROUP BY 1;
-            QUERY PLAN            
-----------------------------------
- HashAggregate
-   Group Key: c1
-   ->  Seq Scan on add_test_table
-(3 rows)
+                QUERY PLAN                
+------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  HashAggregate
+         Group Key: c1
+         ->  Seq Scan on add_test_table
+ Optimizer: Postgres-based planner
+(5 rows)
 
 SET hll.force_groupagg TO ON;
 EXPLAIN(COSTS OFF) 
@@ -192,14 +210,16 @@ SELECT
 FROM 
 	add_test_table 
 GROUP BY 1;
-               QUERY PLAN               
-----------------------------------------
- GroupAggregate
-   Group Key: c1
-   ->  Sort
-         Sort Key: c1
-         ->  Seq Scan on add_test_table
-(5 rows)
+                  QUERY PLAN                  
+----------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  GroupAggregate
+         Group Key: c1
+         ->  Sort
+               Sort Key: c1
+               ->  Seq Scan on add_test_table
+ Optimizer: Postgres-based planner
+(7 rows)
 
 SET hll.force_groupagg TO OFF;
 EXPLAIN(COSTS OFF) 
@@ -208,12 +228,14 @@ SELECT
 FROM 
 	add_test_table 
 GROUP BY 1;
-            QUERY PLAN            
-----------------------------------
- HashAggregate
-   Group Key: c1
-   ->  Seq Scan on add_test_table
-(3 rows)
+                QUERY PLAN                
+------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  HashAggregate
+         Group Key: c1
+         ->  Seq Scan on add_test_table
+ Optimizer: Postgres-based planner
+(5 rows)
 
 SET hll.force_groupagg TO ON;
 EXPLAIN(COSTS OFF) 
@@ -222,14 +244,16 @@ SELECT
 FROM 
 	add_test_table 
 GROUP BY 1;
-               QUERY PLAN               
-----------------------------------------
- GroupAggregate
-   Group Key: c1
-   ->  Sort
-         Sort Key: c1
-         ->  Seq Scan on add_test_table
-(5 rows)
+                  QUERY PLAN                  
+----------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  GroupAggregate
+         Group Key: c1
+         ->  Sort
+               Sort Key: c1
+               ->  Seq Scan on add_test_table
+ Optimizer: Postgres-based planner
+(7 rows)
 
 SET hll.force_groupagg TO OFF;
 EXPLAIN(COSTS OFF) 
@@ -238,12 +262,14 @@ SELECT
 FROM 
 	add_test_table 
 GROUP BY 1;
-            QUERY PLAN            
-----------------------------------
- HashAggregate
-   Group Key: c1
-   ->  Seq Scan on add_test_table
-(3 rows)
+                QUERY PLAN                
+------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  HashAggregate
+         Group Key: c1
+         ->  Seq Scan on add_test_table
+ Optimizer: Postgres-based planner
+(5 rows)
 
 SET hll.force_groupagg TO ON;
 EXPLAIN(COSTS OFF) 
@@ -252,14 +278,16 @@ SELECT
 FROM 
 	add_test_table 
 GROUP BY 1;
-               QUERY PLAN               
-----------------------------------------
- GroupAggregate
-   Group Key: c1
-   ->  Sort
-         Sort Key: c1
-         ->  Seq Scan on add_test_table
-(5 rows)
+                  QUERY PLAN                  
+----------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  GroupAggregate
+         Group Key: c1
+         ->  Sort
+               Sort Key: c1
+               ->  Seq Scan on add_test_table
+ Optimizer: Postgres-based planner
+(7 rows)
 
 SET hll.force_groupagg TO OFF;
 EXPLAIN(COSTS OFF) 
@@ -268,12 +296,14 @@ SELECT
 FROM 
 	add_test_table 
 GROUP BY 1;
-            QUERY PLAN            
-----------------------------------
- HashAggregate
-   Group Key: c1
-   ->  Seq Scan on add_test_table
-(3 rows)
+                QUERY PLAN                
+------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  HashAggregate
+         Group Key: c1
+         ->  Seq Scan on add_test_table
+ Optimizer: Postgres-based planner
+(5 rows)
 
 SET hll.force_groupagg TO ON;
 EXPLAIN(COSTS OFF) 
@@ -282,14 +312,16 @@ SELECT
 FROM 
 	add_test_table 
 GROUP BY 1;
-               QUERY PLAN               
-----------------------------------------
- GroupAggregate
-   Group Key: c1
-   ->  Sort
-         Sort Key: c1
-         ->  Seq Scan on add_test_table
-(5 rows)
+                  QUERY PLAN                  
+----------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  GroupAggregate
+         Group Key: c1
+         ->  Sort
+               Sort Key: c1
+               ->  Seq Scan on add_test_table
+ Optimizer: Postgres-based planner
+(7 rows)
 
 SET hll.force_groupagg TO OFF;
 EXPLAIN(COSTS OFF) 
@@ -298,12 +330,14 @@ SELECT
 FROM 
 	add_test_table 
 GROUP BY 1;
-            QUERY PLAN            
-----------------------------------
- HashAggregate
-   Group Key: c1
-   ->  Seq Scan on add_test_table
-(3 rows)
+                QUERY PLAN                
+------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  HashAggregate
+         Group Key: c1
+         ->  Seq Scan on add_test_table
+ Optimizer: Postgres-based planner
+(5 rows)
 
 SET hll.force_groupagg TO ON;
 EXPLAIN(COSTS OFF) 
@@ -312,14 +346,16 @@ SELECT
 FROM 
 	add_test_table 
 GROUP BY 1;
-               QUERY PLAN               
-----------------------------------------
- GroupAggregate
-   Group Key: c1
-   ->  Sort
-         Sort Key: c1
-         ->  Seq Scan on add_test_table
-(5 rows)
+                  QUERY PLAN                  
+----------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)
+   ->  GroupAggregate
+         Group Key: c1
+         ->  Sort
+               Sort Key: c1
+               ->  Seq Scan on add_test_table
+ Optimizer: Postgres-based planner
+(7 rows)
 
 RESET work_mem;
 DROP TABLE tt1;
