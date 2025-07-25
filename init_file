@@ -1,0 +1,10 @@
+-- start_matchignore
+m/^HINT:.*/
+m/^NOTICE:\s+Table doesn't have 'DISTRIBUTED BY' clause, and no column type is suitable for a distribution key\. Creating a NULL policy entry\.$/
+m/^DETAIL:.*/
+m/^Distributed randomly$/
+-- end_matchignore
+
+-- start_matchignore
+m/^(?:HINT|NOTICE):\s+.+\'DISTRIBUTED BY\' clause.*/
+-- end_matchignore
