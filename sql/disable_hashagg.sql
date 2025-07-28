@@ -22,6 +22,10 @@ INSERT INTO tt1 values(2,2, hll_empty());
 UPDATE tt1 SET sd = hll_add(sd, hll_hash_integer(333)) WHERE id = 2 and col_1 = 1;
 UPDATE tt1 SET sd = hll_add(sd, hll_hash_integer(444)) WHERE id = 2 and col_1 = 2;
 
+-- hll GUCs could not affect ORCA optimizer, since this is only for test
+-- purpose, just turn ORCA off.
+SET optimizer to OFF;
+
 -- Test with hll_union_agg
 SET hll.force_groupagg to OFF;
 EXPLAIN(COSTS OFF)
