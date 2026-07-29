@@ -31,7 +31,7 @@ include $(PGXS)
 SHLIB_LINK	+= -lstdc++
 SQLPP ?= cpp -undef -w -P -imacros $(shell $(PG_CONFIG) --includedir-server)/pg_config.h
 
-src/hll.o: override CFLAGS += -std=c99
+src/hll.o: override CFLAGS += -std=gnu11
 
 %.sql: update/%.sql
 	$(SQLPP) $^ > $@
