@@ -130,7 +130,7 @@ enum {
 static Oid hllAggregateArray[HLL_AGGREGATE_COUNT];
 static bool aggregateValuesInitialized = false;
 
-bool ForceGroupAgg = false;
+static bool ForceGroupAgg = false;
 
 static create_upper_paths_hook_type previous_upper_path_hook;
 static void RegisterConfigVariables(void);
@@ -526,6 +526,9 @@ static int32 encode_expthresh(int64 expthresh)
         return integer_log2(expthresh) + 1;
 }
 
+static size_t mse_nelem_max(void);
+static void check_modifiers(int32 log2m, int32 regwidth, int64 expthresh, int32 sparseon);
+static void check_unpacked_modifiers(int32 log2m, int32 regwidth, int64 expthresh, int32 sparseon);
 // If expthresh == -1 (auto select expthresh) determine
 // the expthresh to use from nbits and nregs.
 //
@@ -542,7 +545,9 @@ expthresh_value(int64 expthresh, size_t nbits, size_t nregs)
         // registers that fits in the same space as the compressed
         // encoding.
         size_t cmpsz = ((nbits * nregs) + 7) / 8;
-        return cmpsz / sizeof(uint64_t);
+        size_t result = cmpsz / sizeof(uint64_t);
+        size_t max_elems = mse_nelem_max();
+        return (result > max_elems) ? max_elems : result;
     }
 }
 
@@ -1223,7 +1228,11 @@ multiset_add(multiset_t * o_msp, uint64_t element)
     size_t expval = expthresh_value(o_msp->ms_expthresh,
                                     o_msp->ms_nbits,
                                     o_msp->ms_nregs);
-    Assert(expval <= mse_nelem_max());
+    if (expval > mse_nelem_max())
+        ereport(ERROR,
+                (errcode(ERRCODE_DATA_EXCEPTION),
+                 errmsg("explicit threshold %zu exceeds maximum buffer capacity %zu",
+                        expval, mse_nelem_max())));
 
     switch (o_msp->ms_type)
     {
@@ -1262,7 +1271,7 @@ multiset_add(multiset_t * o_msp, uint64_t element)
             }
 
             // Is the explicit multiset full?
-            if (msep->mse_nelem == expval)
+            if (msep->mse_nelem >= expval || msep->mse_nelem >= mse_nelem_max())
             {
                 // Convert it to compressed.
                 explicit_to_compressed(o_msp);
@@ -1333,7 +1342,7 @@ explicit_union(multiset_t * o_msp, ms_explicit_t const * i_msep)
                         element_compare))
                 continue;
 
-            if (msep->mse_nelem < expval)
+            if (msep->mse_nelem < expval && msep->mse_nelem < mse_nelem_max())
             {
                 // Add the element at the end.
                 msep->mse_elems[msep->mse_nelem++] = element;
@@ -1415,6 +1424,9 @@ multiset_unpack(multiset_t * o_msp,
             }
 
             unpack_header(o_msp, i_bitp, vers, type);
+
+            check_modifiers(o_msp->ms_log2nregs, o_msp->ms_nbits,
+                            o_msp->ms_expthresh, o_msp->ms_sparseon);
         }
         else
         {
@@ -1452,6 +1464,9 @@ multiset_unpack(multiset_t * o_msp,
 
             unpack_header(o_msp, i_bitp, vers, type);
 
+            check_modifiers(o_msp->ms_log2nregs, o_msp->ms_nbits,
+                            o_msp->ms_expthresh, o_msp->ms_sparseon);
+
             msep->mse_nelem = nelem;
             for (size_t ii = 0; ii < nelem; ++ii)
             {
@@ -1482,16 +1497,22 @@ multiset_unpack(multiset_t * o_msp,
         if (vers == 1)
         {
             size_t hdrsz = 3;
+            size_t nbits;
+            size_t nregs;
+            size_t bitsz;
+            size_t packedbytesz;
 
-            // Decode the parameter byte.
-            uint8_t param = i_bitp[1];
-            size_t nbits = (param >> 5) + 1;
-            size_t log2nregs = param & 0x1f;
-            size_t nregs = 1 << log2nregs;
+            unpack_header(o_msp, i_bitp, vers, type);
+
+            check_unpacked_modifiers(o_msp->ms_log2nregs, o_msp->ms_nbits,
+                                     o_msp->ms_expthresh, o_msp->ms_sparseon);
+
+            nbits = o_msp->ms_nbits;
+            nregs = o_msp->ms_nregs;
 
             // Make sure the size is consistent.
-            size_t bitsz = nbits * nregs;
-            size_t packedbytesz = (bitsz + 7) / 8;
+            bitsz = nbits * nregs;
+            packedbytesz = (bitsz + 7) / 8;
             if ((i_size - hdrsz) != packedbytesz)
             {
                 ereport(ERROR,
@@ -1507,8 +1528,6 @@ multiset_unpack(multiset_t * o_msp,
                         (errcode(ERRCODE_DATA_EXCEPTION),
                          errmsg("compressed multiset too large")));
             }
-
-            unpack_header(o_msp, i_bitp, vers, type);
 
             // Fill the registers.
             compressed_unpack(o_msp->ms_data.as_comp.msc_regs,
@@ -1538,6 +1557,9 @@ multiset_unpack(multiset_t * o_msp,
             }
 
             unpack_header(o_msp, i_bitp, vers, type);
+
+            check_unpacked_modifiers(o_msp->ms_log2nregs, o_msp->ms_nbits,
+                                     o_msp->ms_expthresh, o_msp->ms_sparseon);
         }
         else
         {
@@ -1564,20 +1586,31 @@ multiset_unpack(multiset_t * o_msp,
             }
             else
             {
-                // Decode the parameter byte.
-                uint8_t param = i_bitp[1];
-                size_t nbits = (param >> 5) + 1;
-                size_t log2nregs = param & 0x1f;
-                size_t nregs = 1 << log2nregs;
+                size_t nbits;
+                size_t log2nregs;
+                size_t nregs;
+                size_t bitsz;
+                size_t chunksz;
+                size_t nfilled;
+                size_t ii;
+
+                unpack_header(o_msp, i_bitp, vers, type);
+
+                check_unpacked_modifiers(o_msp->ms_log2nregs, o_msp->ms_nbits,
+                                         o_msp->ms_expthresh, o_msp->ms_sparseon);
+
+                nbits = o_msp->ms_nbits;
+                log2nregs = o_msp->ms_log2nregs;
+                nregs = o_msp->ms_nregs;
 
                 // Figure out how many encoded registers are in the
                 // bitstream.  We depend on the log2nregs + nbits being
                 // greater then the pad size so we aren't left with
                 // ambiguity in the final pad byte.
 
-                size_t bitsz = (i_size - hdrsz) * 8;
-                size_t chunksz = log2nregs + nbits;
-                size_t nfilled = bitsz / chunksz;
+                bitsz = (i_size - hdrsz) * 8;
+                chunksz = log2nregs + nbits;
+                nfilled = bitsz / chunksz;
 
                 // Make sure the compressed array fits in memory.
                 if (nregs * sizeof(compreg_t) > MS_MAXDATA)
@@ -1587,14 +1620,12 @@ multiset_unpack(multiset_t * o_msp,
                              errmsg("sparse multiset too large")));
                 }
 
-                unpack_header(o_msp, i_bitp, vers, type);
-
                 mscp = &o_msp->ms_data.as_comp;
 
                 // Pre-zero the registers since sparse only fills
                 // in occasional ones.
                 //
-                for (size_t ii = 0; ii < nregs; ++ii)
+                for (ii = 0; ii < nregs; ++ii)
                     mscp->msc_regs[ii] = 0;
 
                 // Fill the registers.
@@ -2064,7 +2095,46 @@ check_modifiers(int32 log2m, int32 regwidth, int64 expthresh, int32 sparseon)
     if (expthresh < -1 || expthresh > expthresh_max)
         ereport(ERROR,
                 (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                 errmsg("expthresh modifier must be between -1 and %ld", expthresh_max)));
+                 errmsg("expthresh modifier must be between -1 and "INT64_FORMAT, expthresh_max)));
+
+    if (expthresh > 0 && (1LL << integer_log2(expthresh)) != expthresh)
+        ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                 errmsg("expthresh modifier must be power of 2")));
+
+    if (sparseon < 0 || sparseon > MAX_BITVAL(SPARSEON_BITS))
+        ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                 errmsg("sparseon modifier must be 0 or 1")));
+}
+
+// Relaxed modifier validation for deserialized data.
+// Like check_modifiers but allows expthresh values above mse_nelem_max()
+// that may exist in data written before the capacity cap was introduced.
+// The runtime expthresh_value() already clamps the effective threshold.
+//
+static void
+check_unpacked_modifiers(int32 log2m, int32 regwidth, int64 expthresh, int32 sparseon)
+{
+    int32 log2m_max = integer_log2(msc_regs_idx_limit());
+
+    if (log2m < 0 || log2m > log2m_max)
+        ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                 errmsg("log2m modifier must be between 0 and %d", log2m_max)));
+
+    if (regwidth < 0 || regwidth > MAX_BITVAL(REGWIDTH_BITS))
+        ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                 errmsg("regwidth modifier must be between 0 and 7")));
+
+    // Accept any value that decode_expthresh can produce: -1, 0,
+    // or a positive power of two.  The mse_nelem_max() cap is
+    // enforced at runtime in expthresh_value().
+    if (expthresh < -1)
+        ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                 errmsg("expthresh modifier must be >= -1")));
 
     if (expthresh > 0 && (1LL << integer_log2(expthresh)) != expthresh)
         ereport(ERROR,
@@ -3863,6 +3933,11 @@ hll_serialize(PG_FUNCTION_ARGS)
     multiSet = (multiset_t *) PG_GETARG_POINTER(0);
     multiSetSize = multiset_copy_size(multiSet);
 
+    if (multiSetSize > sizeof(multiset_t))
+        ereport(ERROR,
+                (errcode(ERRCODE_DATA_EXCEPTION),
+                 errmsg("serialized HLL exceeds maximum multiset size")));
+
     serializedBytes = palloc(VARHDRSZ + multiSetSize);
 
     SET_VARSIZE(serializedBytes, VARHDRSZ + multiSetSize);
@@ -3885,10 +3960,25 @@ hll_deserialize(PG_FUNCTION_ARGS)
                 (errcode(ERRCODE_DATA_EXCEPTION),
                  errmsg("hll_deserialize outside transition context")));
 
-    multiSet = palloc(sizeof(multiset_t));
-
     multiSetSize = VARSIZE(serializedBytes) - VARHDRSZ;
+
+    if (multiSetSize < __builtin_offsetof(multiset_t, ms_data))
+        ereport(ERROR,
+                (errcode(ERRCODE_DATA_EXCEPTION),
+                 errmsg("deserialized HLL state is truncated")));
+
+    if (multiSetSize > sizeof(multiset_t))
+        ereport(ERROR,
+                (errcode(ERRCODE_DATA_EXCEPTION),
+                 errmsg("deserialized HLL exceeds maximum multiset size")));
+
+    multiSet = palloc0(sizeof(multiset_t));
     memcpy(multiSet, VARDATA(serializedBytes), multiSetSize);
+
+    if (multiset_copy_size(multiSet) != multiSetSize)
+        ereport(ERROR,
+                (errcode(ERRCODE_DATA_EXCEPTION),
+                 errmsg("deserialized HLL state has inconsistent size")));
 
     PG_RETURN_POINTER(multiSet);
 }
