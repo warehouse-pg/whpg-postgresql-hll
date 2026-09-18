@@ -45,6 +45,10 @@
 #include "utils/fmgroids.h"
 #if (PG_VERSION_NUM >= 100000)
 #include "utils/fmgrprotos.h"
+#else
+// fmgrprotos.h does not exist before PG10; int8in/int8out are declared
+// in int8.h there, and builtins.h does not pull them in.
+#include "utils/int8.h"
 #endif
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
