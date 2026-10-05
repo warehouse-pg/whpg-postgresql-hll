@@ -1,3 +1,19 @@
+2026-06-01
+==========
+v2.21
+- Hardened input validation in multiset_unpack and hll_deserialize
+- Enforce thresholds in explicit representation handling
+
+2026-05-26
+==========
+v2.20
+- Updated for PostgreSQL 19 and some fixes
+
+2025-10-17
+==========
+v2.19
+- Updated for PostgreSQL 18
+
 2023-08-29
 ==========
 v2.18
