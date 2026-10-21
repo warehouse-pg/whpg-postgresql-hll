@@ -1060,9 +1060,7 @@ static char *
 multiset_tostring(multiset_t const * i_msp)
 {
     char expbuf[256];
-    char * retstr;
-    size_t len;
-    size_t used;
+    StringInfoData buf;
     size_t nbits = i_msp->ms_nbits;
     size_t nregs = i_msp->ms_nregs;
     int64 expthresh = i_msp->ms_expthresh;
@@ -1078,19 +1076,14 @@ multiset_tostring(multiset_t const * i_msp)
     else
         snprintf(expbuf, sizeof(expbuf), INT64_FORMAT, expthresh);
 
-    // Allocate an initial return buffer.
-    len = 1024;
-    retstr = (char *) palloc(len);
-    memset(retstr, '\0', len);
-
-    // We haven't used any return buffer yet.
-    used = 0;
+    // The output buffer grows as needed and is always NUL-terminated.
+    initStringInfo(&buf);
 
     // Print in a type-dependent way.
     switch (i_msp->ms_type)
     {
     case MST_EMPTY:
-        used += snprintf(retstr, len, "EMPTY, "
+        appendStringInfo(&buf, "EMPTY, "
                          "nregs=%zu, nbits=%zu, expthresh=%s, sparseon=%zu",
                          nregs, nbits, expbuf, sparseon);
         break;
@@ -1098,27 +1091,15 @@ multiset_tostring(multiset_t const * i_msp)
         {
             ms_explicit_t const * msep = &i_msp->ms_data.as_expl;
             size_t size = msep->mse_nelem;
-            char linebuf[1024];
-            ssize_t rv;
 
-            used += snprintf(retstr, len, "EXPLICIT, %zu elements, "
+            appendStringInfo(&buf, "EXPLICIT, %zu elements, "
                              "nregs=%zu, nbits=%zu, "
                              "expthresh=%s, sparseon=%zu:",
                              size, nregs, nbits, expbuf, sparseon);
             for (size_t ii = 0; ii < size; ++ii)
             {
                 int64_t val = * (int64_t const *) & msep->mse_elems[ii];
-                rv = snprintf(linebuf, sizeof(linebuf),
-                              "\n%zu: %20" PRIi64 " ",
-                              ii, val);
-                // Do we need to reallocate the return buffer?
-                if (rv + used > len - 1)
-                {
-                    len += 1024;
-                    retstr = (char *) repalloc(retstr, len);
-                }
-                strncpy(&retstr[used], linebuf, len - used);
-                used += rv;
+                appendStringInfo(&buf, "\n%zu: %20" PRIi64 " ", ii, val);
             }
         }
         break;
@@ -1126,13 +1107,11 @@ multiset_tostring(multiset_t const * i_msp)
         {
             ms_compressed_t const * mscp = &i_msp->ms_data.as_comp;
 
-            char linebuf[1024];
-
             size_t rowsz = 32;
             size_t nrows = nregs / rowsz;
             size_t ndx = 0;
 
-            used += snprintf(retstr, len,
+            appendStringInfo(&buf,
                              "COMPRESSED, %zu filled "
                              "nregs=%zu, nbits=%zu, expthresh=%s, "
                              "sparseon=%zu:",
@@ -1141,28 +1120,17 @@ multiset_tostring(multiset_t const * i_msp)
 
             for (size_t rr = 0; rr < nrows; ++rr)
             {
-                size_t pos = 0;
-                pos = snprintf(linebuf, sizeof(linebuf), "\n%4zu: ", ndx);
+                appendStringInfo(&buf, "\n%4zu: ", ndx);
                 for (size_t cc = 0; cc < rowsz; ++cc)
                 {
-                    pos += snprintf(&linebuf[pos], sizeof(linebuf) - pos,
-                                    "%2d ", mscp->msc_regs[ndx]);
+                    appendStringInfo(&buf, "%2d ", mscp->msc_regs[ndx]);
                     ++ndx;
                 }
-
-                // Do we need to reallocate the return buffer?
-                if (pos + used > len - 1)
-                {
-                    len += 1024;
-                    retstr = (char *) repalloc(retstr, len);
-                }
-                strncpy(&retstr[used], linebuf, len - used);
-                used += pos;
             }
         }
         break;
     case MST_UNDEFINED:
-        used += snprintf(retstr, len, "UNDEFINED "
+        appendStringInfo(&buf, "UNDEFINED "
                          "nregs=%zu, nbits=%zu, expthresh=%s, sparseon=%zu",
                          nregs, nbits, expbuf, sparseon);
         break;
@@ -1173,7 +1141,7 @@ multiset_tostring(multiset_t const * i_msp)
         break;
     }
 
-    return retstr;
+    return buf.data;
 }
 
 static void
@@ -2257,17 +2225,8 @@ hll_typmod_out(PG_FUNCTION_ARGS)
     int64 expthresh = decode_expthresh(typmod_expthresh(typmod));
     int32 sparseon = typmod_sparseon(typmod);
 
-    char buffer[1024];
-    size_t len;
-    char * typmodstr;
-
-    memset(buffer, '\0', sizeof(buffer));
-    snprintf(buffer, sizeof(buffer), "(%d,%d," INT64_FORMAT ",%d)",
-             log2m, regwidth, expthresh, sparseon);
-
-    len = strlen(buffer) + 1;
-    typmodstr = (char *) palloc(len);
-    strncpy(typmodstr, buffer, len);
+    char * typmodstr = psprintf("(%d,%d," INT64_FORMAT ",%d)",
+                                log2m, regwidth, expthresh, sparseon);
 
 	PG_RETURN_CSTRING(typmodstr);
 }
