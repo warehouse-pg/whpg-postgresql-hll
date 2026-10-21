@@ -20,13 +20,14 @@ for details.
 * Try and follow similar coding styles as found throughout the code
   base.
 * Make commits as logical units for ease of reviewing.
-* Rebase with `master` often to stay in sync with upstream.
+* Rebase on `origin/master` often to stay in sync.
 * Add or update tests to cover your code. Build with `make` against a
   WarehousePG installation whose `pg_config` is on your `PATH`, then
   run `make install`, and with a running WarehousePG cluster run
   `PGOPTIONS='-c optimizer=off' make installcheck`. Regression tests
-  live under [`sql`](sql) and [`expected`](expected).
-* Keep changes working on every supported WarehousePG line (6, 7 and
+  live under [`sql`](sql) and [`expected`](expected); the expected
+  output assumes a 3-segment cluster (the standard demo cluster).
+* Keep changes working on every supported WarehousePG line (7 and
   19). Where only some lines produce different output, add an
   alternative expected file (e.g. `expected/hash_0.out`).
 * Ensure a well written commit message as explained
@@ -48,7 +49,7 @@ git commit --squash <commit SHA>
 * Once approved, before merging into `master` squash your fixups with:
 ```
 git rebase -i --autosquash origin/master
-git push --force-with-lease $USER <my-feature-branch>
+git push --force-with-lease <your_fork> my_feature_branch
 ```
 
 Your contribution will be analyzed for product fit and engineering

@@ -26,6 +26,10 @@ make install         # may need root to write into $GPHOME
 PGOPTIONS='-c optimizer=off' make installcheck
 ```
 
+The expected output assumes a 3-segment cluster, the standard demo cluster.
+On a cluster with a different number of segments the `disable_hashagg` test
+fails, because its expected plans include the segment count.
+
 Then load the extension with `CREATE EXTENSION hll;`.
 
 The upstream postgresql-hll documentation is kept below.

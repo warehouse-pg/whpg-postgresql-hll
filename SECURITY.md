@@ -82,10 +82,11 @@ follows:
    solution is not well-tested. The timeframe for disclosure is from immediate
    (especially if it's already publicly known) to a few weeks. The WarehousePG
    project team holds the final say when setting a public disclosure date.
-8. Once the fix is confirmed, the WarehousePG project team will patch the
-   vulnerability in the next patch or minor release, and backport a patch release
-   into earlier supported releases as necessary. Upon release of the patched
-   version of WarehousePG, we will follow the **Public Disclosure Process**.
+8. Once the fix is confirmed, the WarehousePG project team will release it in
+   the next patch or minor release of WarehousePG postgresql-hll, and update
+   the WarehousePG postgresql-hll packages for the supported WarehousePG
+   releases as necessary. Upon release of the patched version of
+   WarehousePG postgresql-hll, we will follow the **Public Disclosure Process**.
 
 ## Public Disclosure Process
 
@@ -107,10 +108,11 @@ is also a serious security concern. The WarehousePG project team takes
 all vulnerabilities, potential vulnerabilities, and suspected vulnerabilities
 seriously and will investigate them in an urgent and expeditious manner.
 
-Note that we do not currently consider the default settings for WarehousePG
-to be secure-by-default. It is necessary for operators to explicitly
+WarehousePG postgresql-hll runs inside a WarehousePG cluster and relies on
+the server's configuration. We do not currently consider the default settings
+for WarehousePG to be secure-by-default: operators need to explicitly
 configure settings, role based access control, and other resource related
-features in WarehousePG to provide a hardened WarehousePG environment. We will
-not act on any security disclosure that relates to a lack of safe defaults.
-Over time, we will work towards improved safe-by-default configuration, taking
-into account backwards compatibility.
+features to provide a hardened environment. Issues that come from WarehousePG
+server defaults rather than from WarehousePG postgresql-hll itself are covered
+by the
+[WarehousePG security policy](https://github.com/warehouse-pg/warehouse-pg/blob/main/SECURITY.md).
