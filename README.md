@@ -1,4 +1,46 @@
-[![Build Status](https://travis-ci.org/aggregateknowledge/postgresql-hll.svg?branch=master)](https://travis-ci.org/aggregateknowledge/postgresql-hll)
+# WarehousePG postgresql-hll
+
+## Introduction
+
+postgresql-hll adds an `hll` data type that holds a HyperLogLog sketch: a
+fixed-size, set-like structure for approximate distinct counting with tunable
+precision. In a distributed database like WarehousePG it lets you keep
+mergeable distinct-count summaries per segment, roll them up across segments
+and time windows with `hll_union_agg`, and read the cardinality with
+`hll_cardinality`, without rescanning the raw data.
+
+This repository is a fork of the open-source postgresql-hll project
+(github.com/citusdata/postgresql-hll), renamed to whpg-postgresql-hll and
+maintained for WarehousePG. The `master` branch is based on postgresql-hll
+2.21, with the WarehousePG changes on top.
+
+## Building and Testing
+
+With the WarehousePG `pg_config` on your `PATH`:
+
+```
+make
+make install         # may need root to write into $GPHOME
+# needs a running WarehousePG cluster; the regression output assumes the
+# Postgres planner, so turn GPORCA off as the packaging smoke test does
+PGOPTIONS='-c optimizer=off' make installcheck
+```
+
+Then load the extension with `CREATE EXTENSION hll;`.
+
+The upstream postgresql-hll documentation is kept below.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE-OF-CONDUCT.md). To report a security issue, see
+[SECURITY.md](SECURITY.md).
+
+## License
+
+Apache License, Version 2.0. See [LICENSE.md](LICENSE.md).
+
+---
 
 Overview
 ========
